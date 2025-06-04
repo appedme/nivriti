@@ -1,10 +1,12 @@
 import Layout from '@/components/layout/Layout'
 import HeroSection from '@/components/home/HeroSection'
 import StoryFeed from '@/components/home/StoryFeed'
+import { auth } from '@/lib/auth'
 
-export default function Home() {
-  // Mock user data - replace with actual auth
-  const user = null // or actual user data from auth
+export default async function Home() {
+  // Get actual user session
+  const session = await auth()
+  const user = session?.user || null
 
   return (
     <Layout user={user}>

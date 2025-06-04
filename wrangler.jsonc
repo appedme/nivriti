@@ -21,8 +21,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "nivrita-todo-db",
-			"database_id": "bb89da47-fb94-4e65-9e3a-6138d80dc43a",
+			"database_name": "nivrita-db",
+			"database_id": "b6891950-2f7b-4f66-93e1-d6f6f62cc01a",
 			"migrations_dir": "drizzle/migrations"
 		}
 	]

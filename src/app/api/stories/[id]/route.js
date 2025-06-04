@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getDB, schema } from '@/db'
 import { eq, and } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
 
 // GET /api/stories/[id] - Fetch a specific story
 export async function GET(request, { params }) {
     try {
         const { id } = params
+        const { searchParams } = new URL(request.url)
+        const includeChapters = searchParams.get('includeChapters') === 'true'
+        
         const db = getDB()
 
         const story = await db
@@ -24,6 +28,8 @@ export async function GET(request, { params }) {
                 commentCount: schema.stories.commentCount,
                 viewCount: schema.stories.viewCount,
                 isPublished: schema.stories.isPublished,
+                isMultiChapter: schema.stories.isMultiChapter,
+                chapterCount: schema.stories.chapterCount,
                 authorId: schema.stories.authorId,
                 authorName: schema.users.name,
                 authorUsername: schema.users.username,
@@ -61,6 +67,21 @@ export async function GET(request, { params }) {
                 .where(eq(schema.stories.id, id))
         }
 
+        // Get chapters if requested and if it's a multi-chapter story
+        let chapters = []
+        if (includeChapters && storyData.isMultiChapter) {
+            chapters = await db
+                .select()
+                .from(schema.chapters)
+                .where(eq(schema.chapters.storyId, id))
+                .orderBy(schema.chapters.orderIndex)
+                
+            // Filter out unpublished chapters if user is not the author
+            if (!session?.user || storyData.authorId !== session.user.id) {
+                chapters = chapters.filter(chapter => chapter.isPublished)
+            }
+        }
+
         return NextResponse.json({
             story: {
                 id: storyData.id,
@@ -74,15 +95,18 @@ export async function GET(request, { params }) {
                 readTime: storyData.readTime,
                 likes: storyData.likeCount,
                 comments: storyData.commentCount,
-                views: storyData.viewCount + 1,
+                views: storyData.viewCount + (storyData.isPublished ? 1 : 0),
                 isPublished: storyData.isPublished,
+                isMultiChapter: storyData.isMultiChapter,
+                chapterCount: storyData.chapterCount,
                 author: {
                     id: storyData.authorId,
                     name: storyData.authorName,
                     username: storyData.authorUsername,
                     avatar: storyData.authorAvatar,
                     bio: storyData.authorBio
-                }
+                },
+                ...(includeChapters && storyData.isMultiChapter && { chapters })
             }
         })
     } catch (error) {
@@ -107,7 +131,7 @@ export async function PUT(request, { params }) {
 
         const { id } = params
         const body = await request.json()
-        const { title, content, excerpt, tags, coverImage, isPublished } = body
+        const { title, content, excerpt, tags, coverImage, isPublished, isMultiChapter } = body
 
         const db = getDB()
 
@@ -128,23 +152,65 @@ export async function PUT(request, { params }) {
             )
         }
 
-        // Calculate read time if content changed
+        // Import editor utilities
+        const { calculateReadTime, extractExcerpt } = await import('@/lib/editor')
+
+        // Calculate read time if content changed for single stories
         let readTime = existingStory[0].readTime
-        if (content && content !== existingStory[0].content) {
-            const wordCount = content.split(/\s+/).length
-            readTime = Math.ceil(wordCount / 200)
+        let storyExcerpt = excerpt || existingStory[0].excerpt
+
+        if (!existingStory[0].isMultiChapter && content && content !== existingStory[0].content) {
+            readTime = calculateReadTime(content)
+            if (!excerpt) {
+                storyExcerpt = extractExcerpt(content)
+            }
+        }
+        
+        // Handle multi-chapter conversion
+        if (typeof isMultiChapter === 'boolean' && isMultiChapter !== existingStory[0].isMultiChapter) {
+            // Converting to multi-chapter
+            if (isMultiChapter && existingStory[0].content) {
+                // Create a first chapter from existing content
+                const existingContent = existingStory[0].content
+                const chapterReadTime = calculateReadTime(existingContent)
+                
+                await db
+                    .insert(schema.chapters)
+                    .values({
+                        id: nanoid(),
+                        title: 'Chapter 1',
+                        content: existingContent,
+                        orderIndex: 0,
+                        storyId: id,
+                        isPublished: existingStory[0].isPublished,
+                        readTime: chapterReadTime,
+                        viewCount: 0
+                    })
+                
+                // Update chapter count
+                await db
+                    .update(schema.stories)
+                    .set({
+                        chapterCount: 1,
+                        content: null  // Clear content from main story
+                    })
+                    .where(eq(schema.stories.id, id))
+            }
+            // Converting from multi-chapter to single, handled by frontend
+            // as it requires choosing which chapter to use
         }
 
         const updatedStory = await db
             .update(schema.stories)
             .set({
                 ...(title && { title }),
-                ...(content && { content }),
-                ...(excerpt && { excerpt }),
+                ...(content && !isMultiChapter && { content }),
+                ...(storyExcerpt && { excerpt: storyExcerpt }),
                 ...(tags && { tags: Array.isArray(tags) ? tags.join(',') : tags }),
                 ...(coverImage && { coverImage }),
                 ...(typeof isPublished === 'boolean' && { isPublished }),
-                ...(content && { readTime }),
+                ...(typeof isMultiChapter === 'boolean' && { isMultiChapter }),
+                ...(readTime && !isMultiChapter && { readTime }),
                 updatedAt: new Date()
             })
             .where(eq(schema.stories.id, id))

@@ -6,7 +6,12 @@ import { eq } from "drizzle-orm"
 // For development, we'll use JWT sessions to avoid database initialization issues
 // In production, you might want to switch back to database sessions
 export const { handlers, auth, signIn, signOut } = NextAuth({
-    providers: [Google],
+    providers: [
+        Google({
+            clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+        })
+    ],
     callbacks: {
         async signIn({ user, account, profile }) {
             try {

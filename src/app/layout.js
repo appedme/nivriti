@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/AuthProvider";
+import { Toaster } from 'sonner';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Nivrita - Personal Todo App",
-  description: "A personal todo application with Google authentication",
+  title: "Nivriti - Calm Storytelling Platform",
+  description: "A platform for mindful storytelling and gentle community",
 };
 
 export default function RootLayout({ children }) {
@@ -25,6 +26,12 @@ export default function RootLayout({ children }) {
       >
         <AuthProvider>
           {children}
+          <Toaster 
+            position="bottom-right" 
+            richColors 
+            closeButton 
+            duration={4000}
+          />
         </AuthProvider>
       </body>
     </html>

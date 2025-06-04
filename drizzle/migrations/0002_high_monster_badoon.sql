@@ -1,1 +1,0 @@
-ALTER TABLE `todos` ADD `userId` text NOT NULL REFERENCES users(id);

@@ -6,65 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { TrendingUp, Clock, Heart, Filter } from 'lucide-react'
+import { TrendingUp, Clock, Heart, Filter, Loader2 } from 'lucide-react'
 import StoryCard from '../stories/StoryCard'
-
-// Mock data - replace with real data
-const mockStories = [
-  {
-    id: '1',
-    title: 'Finding Peace in Morning Rituals',
-    excerpt: 'How a simple cup of tea changed my perspective on mindfulness and presence. In the quiet moments of dawn, I discovered something profound about the art of being still...',
-    author: {
-      name: 'Sarah Chen',
-      avatar: '/api/placeholder/40/40'
-    },
-    coverImage: '/api/placeholder/400/200',
-    tags: ['Healing', 'Mindfulness', 'Daily Life'],
-    publishedAt: '2 hours ago',
-    readTime: 5,
-    likeCount: 24,
-    commentCount: 8,
-    viewCount: 156,
-    isLiked: false,
-    isBookmarked: true
-  },
-  {
-    id: '2',
-    title: 'Letters to My Younger Self',
-    excerpt: 'A collection of gentle words I wish someone had told me when I was learning to navigate this beautiful, complex world of emotions and dreams...',
-    author: {
-      name: 'Marcus Johnson',
-      avatar: '/api/placeholder/40/40'
-    },
-    tags: ['Life Stories', 'Healing', 'Reflection'],
-    publishedAt: '5 hours ago',
-    readTime: 8,
-    likeCount: 42,
-    commentCount: 15,
-    viewCount: 289,
-    isLiked: true,
-    isBookmarked: false
-  },
-  {
-    id: '3',
-    title: 'The Garden That Taught Me Patience',
-    excerpt: 'Through seasons of planting, waiting, and harvesting, I learned that growth happens in its own time. Here\'s what my garden taught me about life...',
-    author: {
-      name: 'Elena Rodriguez',
-      avatar: '/api/placeholder/40/40'
-    },
-    coverImage: '/api/placeholder/400/200',
-    tags: ['Nature', 'Life Lessons', 'Poetry'],
-    publishedAt: '1 day ago',
-    readTime: 6,
-    likeCount: 18,
-    commentCount: 12,
-    viewCount: 203,
-    isLiked: false,
-    isBookmarked: false
-  }
-]
+import { useStories } from '@/hooks/useApi'
 
 const featuredTags = [
   'Healing', 'Romance', 'Fiction', 'Poetry', 'Life Stories', 'Mindfulness', 'Adventure', 'Mystery'
@@ -73,6 +17,16 @@ const featuredTags = [
 export default function StoryFeed() {
   const [activeTab, setActiveTab] = useState('recent')
   const [selectedTags, setSelectedTags] = useState([])
+  const [page, setPage] = useState(1)
+  
+  // Build query parameters
+  const queryParams = {
+    page,
+    limit: 10,
+    ...(selectedTags.length > 0 && { tag: selectedTags[0] }) // For now, use first selected tag
+  }
+  
+  const { data, loading, error, refetch } = useStories(queryParams)
 
   const toggleTag = (tag) => {
     setSelectedTags(prev => 
@@ -80,6 +34,16 @@ export default function StoryFeed() {
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     )
+    setPage(1) // Reset to first page when filtering
+  }
+
+  const handleLikeUpdate = (storyId, liked, newLikeCount) => {
+    // Optionally refetch data or update local state
+    // For now, the StoryCard handles its own state
+  }
+
+  const loadMore = () => {
+    setPage(prev => prev + 1)
   }
 
   return (
@@ -109,19 +73,54 @@ export default function StoryFeed() {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Story Lists */}
+                {/* Stories Content */}
                 <TabsContent value="recent" className="mt-6 space-y-6">
-                  {mockStories.map((story) => (
-                    <StoryCard key={story.id} story={story} />
-                  ))}
+                  {loading && (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span className="ml-2">Loading stories...</span>
+                    </div>
+                  )}
+                  
+                  {error && (
+                    <div className="text-center py-12">
+                      <p className="text-red-600 mb-4">Failed to load stories: {error}</p>
+                      <Button onClick={refetch} variant="outline">
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {data?.stories && (
+                    <div className="space-y-6">
+                      {data.stories.map((story) => (
+                        <StoryCard 
+                          key={story.id} 
+                          story={story} 
+                          onLikeUpdate={handleLikeUpdate}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {data?.stories?.length === 0 && !loading && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600 mb-4">No stories found</p>
+                      <Button asChild>
+                        <a href="/write">Write the first story</a>
+                      </Button>
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="trending" className="mt-6 space-y-6">
-                  {mockStories
-                    .sort((a, b) => b.likeCount - a.likeCount)
-                    .map((story) => (
-                    <StoryCard key={story.id} story={story} />
-                  ))}
+                  <div className="text-center py-12">
+                    <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 mb-4">Trending stories coming soon!</p>
+                    <Button asChild>
+                      <a href="/explore">Explore Stories</a>
+                    </Button>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="following" className="mt-6 space-y-6">
@@ -144,11 +143,25 @@ export default function StoryFeed() {
             </div>
 
             {/* Load More */}
-            <div className="text-center pt-8">
-              <Button variant="outline" size="lg">
-                Load More Stories
-              </Button>
-            </div>
+            {data?.pagination && data.pagination.page < data.pagination.totalPages && (
+              <div className="text-center pt-8">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={loadMore}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More Stories'
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}

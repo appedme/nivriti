@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getDB, schema } from '@/db'
 import { eq, desc, and, like, or } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
 
 // GET /api/stories - Fetch stories with pagination and filters
 export async function GET(request) {
@@ -123,30 +124,59 @@ export async function POST(request) {
         }
 
         const body = await request.json()
-        const { title, content, excerpt, tags, coverImage, isPublished = false } = body
+        const { 
+            title, 
+            content, 
+            excerpt, 
+            tags, 
+            coverImage, 
+            isPublished = false,
+            isMultiChapter = false 
+        } = body
 
-        if (!title || !content) {
+        if (!title) {
             return NextResponse.json(
-                { error: 'Title and content are required' },
+                { error: 'Title is required' },
+                { status: 400 }
+            )
+        }
+
+        // For single stories, content is required
+        if (!isMultiChapter && !content) {
+            return NextResponse.json(
+                { error: 'Content is required for single stories' },
                 { status: 400 }
             )
         }
 
         const db = getDB()
+        
+        // Import editor utilities
+        const { calculateReadTime, extractExcerpt } = await import('@/lib/editor')
 
-        // Calculate read time (approximately 200 words per minute)
-        const wordCount = content.split(/\s+/).length
-        const readTime = Math.ceil(wordCount / 200)
+        // Calculate read time and excerpt for single stories
+        let readTime = null
+        let storyExcerpt = excerpt
+        
+        if (!isMultiChapter && content) {
+            readTime = calculateReadTime(content)
+            if (!storyExcerpt) {
+                storyExcerpt = extractExcerpt(content)
+            }
+        }
 
         const newStory = await db.insert(schema.stories).values({
+            id: nanoid(), // Ensure you import nanoid
             title,
-            content,
-            excerpt: excerpt || content.substring(0, 200) + '...',
+            content: isMultiChapter ? null : content,
+            excerpt: storyExcerpt,
             tags: Array.isArray(tags) ? tags.join(',') : tags,
             coverImage,
             readTime,
             authorId: session.user.id,
             isPublished,
+            isMultiChapter,
+            chapterCount: 0,
             likeCount: 0,
             commentCount: 0,
             viewCount: 0

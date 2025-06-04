@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,21 +22,52 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useLikeStory } from '@/hooks/useApi'
+import { toast } from 'sonner'
 
-export default function StoryCard({ story }) {
+export default function StoryCard({ story, onLikeUpdate }) {
+  const { data: session } = useSession()
   const [isLiked, setIsLiked] = useState(story?.isLiked || false)
   const [isBookmarked, setIsBookmarked] = useState(story?.isBookmarked || false)
-  const [likeCount, setLikeCount] = useState(story?.likeCount || 0)
+  const [likeCount, setLikeCount] = useState(story?.likes || story?.likeCount || 0)
+  const { likeStory, loading: likeLoading } = useLikeStory()
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault()
-    setIsLiked(!isLiked)
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1)
+    
+    if (!session) {
+      toast.error('Please sign in to like stories')
+      return
+    }
+
+    if (likeLoading) return
+
+    try {
+      const result = await likeStory(story.id)
+      setIsLiked(result.liked)
+      setLikeCount(result.likeCount)
+      
+      if (onLikeUpdate) {
+        onLikeUpdate(story.id, result.liked, result.likeCount)
+      }
+      
+      toast.success(result.message)
+    } catch (error) {
+      toast.error('Failed to like story')
+      console.error('Error liking story:', error)
+    }
   }
 
   const handleBookmark = (e) => {
     e.preventDefault()
+    
+    if (!session) {
+      toast.error('Please sign in to bookmark stories')
+      return
+    }
+    
     setIsBookmarked(!isBookmarked)
+    toast.success(isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks')
   }
 
   const handleShare = (e) => {
@@ -48,6 +80,7 @@ export default function StoryCard({ story }) {
       })
     } else {
       navigator.clipboard.writeText(`${window.location.origin}/story/${story.id}`)
+      toast.success('Link copied to clipboard')
     }
   }
 

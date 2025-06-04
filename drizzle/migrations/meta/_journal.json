@@ -5,22 +5,15 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1749018710576,
-      "tag": "0000_colorful_warlock",
+      "when": 1749024854137,
+      "tag": "0000_right_gunslinger",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "6",
-      "when": 1749019263019,
-      "tag": "0001_curly_manta",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1749019343101,
-      "tag": "0002_high_monster_badoon",
+      "when": 1749026636048,
+      "tag": "0001_strong_quasar",
       "breakpoints": true
     }
   ]

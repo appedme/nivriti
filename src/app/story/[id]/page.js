@@ -1,83 +1,92 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Heart, Bookmark, Share2, MessageCircle, Copy, Twitter, Facebook, Link2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { ArrowLeft, Heart, Bookmark, Share2, MessageCircle, Copy, Twitter, Facebook, Link2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import Layout from '@/components/layout/Layout';
+import { useStory, useComments, useApiMutation } from '@/hooks/useApi';
 import Link from 'next/link';
 
-// Mock story data - replace with API call
-const storyData = {
-    id: 1,
-    title: "Finding Peace in the Morning Light",
-    content: `The first rays of sunlight filtered through my bedroom window, painting golden patterns on the wall. I had woken up before my alarm again, but for once, I didn't feel anxious about it.
-
-Instead, I lay there for a moment, listening to the gentle sounds of the morning - birds chirping, a distant car starting, the soft rustle of leaves in the breeze. There was something magical about these quiet moments before the world fully awakens.
-
-I thought about the meditation class I had attended last week. The instructor had said something that stuck with me: "Peace isn't found in the absence of chaos, but in our response to it." At the time, it felt like just another wellness cliché. But lying there in the morning light, I began to understand.
-
-Yesterday had been challenging. Work deadlines, family obligations, the usual stress of modern life. But here, in this moment, none of that seemed to matter. The sunlight didn't care about my to-do list. The birds didn't sing any softer because I had bills to pay.
-
-I got up slowly, made myself a cup of tea, and sat by the window. For the first time in months, I wasn't thinking about what I needed to do next. I was just... present.
-
-Sometimes the most profound moments are the simplest ones.`,
-    author: {
-        name: "Sarah Chen",
-        username: "sarahwrites",
-        avatar: "/api/placeholder/40/40",
-        bio: "Finding stories in everyday moments"
-    },
-    publishedAt: "2024-01-15",
-    readTime: "3 min read",
-    tags: ["mindfulness", "morning", "peace", "healing"],
-    likes: 142,
-    comments: 28,
-    isLiked: false,
-    isBookmarked: false,
-    coverImage: "/api/placeholder/800/400"
-};
-
 export default function StoryPage({ params }) {
-    const [story, setStory] = useState(storyData);
+    const { data: session } = useSession();
+    const { data: storyData, loading: storyLoading, error: storyError } = useStory(params.id);
+    const { data: commentsData, loading: commentsLoading, refetch: refetchComments } = useComments(params.id);
+    const { mutate } = useApiMutation();
+
     const [comment, setComment] = useState('');
     const [showShareMenu, setShowShareMenu] = useState(false);
-    const [comments, setComments] = useState([
-        {
-            id: 1,
-            author: "Maya Patel",
-            content: "This resonated so deeply with me. Thank you for sharing these beautiful moments.",
-            timestamp: "2 hours ago",
-            avatar: "/api/placeholder/32/32"
-        },
-        {
-            id: 2,
-            author: "Alex Johnson",
-            content: "Your writing always reminds me to slow down and appreciate the present.",
-            timestamp: "5 hours ago",
-            avatar: "/api/placeholder/32/32"
-        }
-    ]);
+    const [isLiked, setIsLiked] = useState(false);
+    const [isBookmarked, setIsBookmarked] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
+    const [commentCount, setCommentCount] = useState(0);
 
-    const handleLike = () => {
-        setStory(prev => ({
-            ...prev,
-            isLiked: !prev.isLiked,
-            likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1
-        }));
+    // Initialize state when story data is loaded
+    useEffect(() => {
+        if (storyData?.story) {
+            setIsLiked(storyData.story.isLiked || false);
+            setIsBookmarked(storyData.story.isBookmarked || false);
+            setLikeCount(storyData.story.likes || 0);
+            setCommentCount(storyData.story.comments || 0);
+        }
+    }, [storyData]);
+
+    const story = storyData?.story;
+    const comments = commentsData?.comments || [];
+
+    const handleLike = async () => {
+        if (!session) {
+            toast.error('Please sign in to like stories');
+            return;
+        }
+
+        try {
+            const optimisticLiked = !isLiked;
+            const optimisticCount = optimisticLiked ? likeCount + 1 : likeCount - 1;
+
+            // Optimistic update
+            setIsLiked(optimisticLiked);
+            setLikeCount(optimisticCount);
+
+            await mutate(`/api/stories/${params.id}/like`, {
+                method: 'POST'
+            });
+
+            toast.success(optimisticLiked ? 'Story liked!' : 'Story unliked');
+        } catch (error) {
+            // Revert optimistic update on error
+            setIsLiked(!isLiked);
+            setLikeCount(likeCount);
+            toast.error('Failed to update like status');
+        }
     };
 
-    const handleBookmark = () => {
-        setStory(prev => ({
-            ...prev,
-            isBookmarked: !prev.isBookmarked
-        }));
+    const handleBookmark = async () => {
+        if (!session) {
+            toast.error('Please sign in to bookmark stories');
+            return;
+        }
+
+        try {
+            setIsBookmarked(!isBookmarked);
+
+            await mutate(`/api/stories/${params.id}/bookmark`, {
+                method: 'POST'
+            });
+
+            toast.success(isBookmarked ? 'Bookmark removed' : 'Story bookmarked!');
+        } catch (error) {
+            setIsBookmarked(isBookmarked);
+            toast.error('Failed to update bookmark status');
+        }
     };
 
     const handleShare = (platform) => {
         const url = window.location.href;
-        const text = `"${story.title}" by ${story.author.name} on Nivriti`;
+        const text = `"${story?.title}" by ${story?.author?.name} on Nivriti`;
 
         switch (platform) {
             case 'twitter':
@@ -88,25 +97,79 @@ export default function StoryPage({ params }) {
                 break;
             case 'copy':
                 navigator.clipboard.writeText(url);
-                alert('Link copied to clipboard!');
+                toast.success('Link copied to clipboard!');
                 break;
         }
         setShowShareMenu(false);
     };
 
-    const handleAddComment = () => {
-        if (comment.trim()) {
-            const newComment = {
-                id: comments.length + 1,
-                author: "You",
-                content: comment,
-                timestamp: "Just now",
-                avatar: "/api/placeholder/32/32"
-            };
-            setComments([newComment, ...comments]);
+    const handleAddComment = async () => {
+        if (!session) {
+            toast.error('Please sign in to comment');
+            return;
+        }
+
+        if (!comment.trim()) {
+            toast.error('Please enter a comment');
+            return;
+        }
+
+        try {
+            await mutate(`/api/stories/${params.id}/comments`, {
+                method: 'POST',
+                body: JSON.stringify({ content: comment.trim() })
+            });
+
             setComment('');
+            setCommentCount(commentCount + 1);
+            refetchComments();
+            toast.success('Comment added!');
+        } catch (error) {
+            toast.error('Failed to add comment');
         }
     };
+
+    // Loading state
+    if (storyLoading) {
+        return (
+            <Layout>
+                <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <div className="animate-pulse">
+                            <div className="h-8 w-32 bg-gray-200 rounded mb-8"></div>
+                            <div className="h-12 w-3/4 bg-gray-200 rounded mb-4"></div>
+                            <div className="h-6 w-1/2 bg-gray-200 rounded mb-8"></div>
+                            <div className="h-64 bg-gray-200 rounded mb-8"></div>
+                            <div className="space-y-4">
+                                <div className="h-4 bg-gray-200 rounded"></div>
+                                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                                <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
+    // Error state
+    if (storyError || !story) {
+        return (
+            <Layout>
+                <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <div className="text-center">
+                            <h1 className="text-2xl font-bold text-gray-900 mb-4">Story Not Found</h1>
+                            <p className="text-gray-600 mb-8">The story you're looking for doesn't exist or has been removed.</p>
+                            <Link href="/" className="text-blue-600 hover:text-blue-700">
+                                ← Back to Stories
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
 
     return (
         <Layout>
@@ -169,13 +232,36 @@ export default function StoryPage({ params }) {
                             />
                         )}
 
-                        <div className="story-content prose prose-lg max-w-none">
-                            {story.content.split('\n\n').map((paragraph, index) => (
-                                <p key={index} className="mb-6 text-gray-800 leading-relaxed">
-                                    {paragraph}
+                        {story.isMultiChapter ? (
+                            <div className="text-center space-y-6 py-4">
+                                <div className="flex items-center justify-center gap-2 text-gray-700">
+                                    <BookOpen className="h-6 w-6" />
+                                    <h3 className="text-xl font-medium">Multi-Chapter Book</h3>
+                                </div>
+                                <p className="text-gray-600 max-w-2xl mx-auto">
+                                    {story.excerpt || "This story is presented as a book with multiple chapters for an immersive reading experience."}
                                 </p>
-                            ))}
-                        </div>
+                                <Button 
+                                    asChild
+                                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                                    size="lg"
+                                >
+                                    <Link href={`/story/${story.id}/read`}>
+                                        <BookOpen className="mr-2 h-5 w-5" />
+                                        Start Reading
+                                    </Link>
+                                </Button>
+                                <p className="text-sm text-gray-500">{story.chapterCount || 0} chapters • {story.readTime}</p>
+                            </div>
+                        ) : (
+                            <div className="story-content prose prose-lg max-w-none">
+                                {story.content.split('\n\n').map((paragraph, index) => (
+                                    <p key={index} className="mb-6 text-gray-800 leading-relaxed">
+                                        {paragraph}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
                     </Card>
 
                     {/* Story Actions */}
@@ -185,19 +271,19 @@ export default function StoryPage({ params }) {
                                 variant="ghost"
                                 size="sm"
                                 onClick={handleLike}
-                                className={`flex items-center space-x-2 ${story.isLiked ? 'text-red-600' : 'text-gray-600'} hover:text-red-600 transition-colors`}
+                                className={`flex items-center space-x-2 ${isLiked ? 'text-red-600' : 'text-gray-600'} hover:text-red-600 transition-colors`}
                             >
-                                <Heart className={`w-5 h-5 ${story.isLiked ? 'fill-current' : ''}`} />
-                                <span>{story.likes}</span>
+                                <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+                                <span>{likeCount}</span>
                             </Button>
 
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={handleBookmark}
-                                className={`flex items-center space-x-2 ${story.isBookmarked ? 'text-blue-600' : 'text-gray-600'} hover:text-blue-600 transition-colors`}
+                                className={`flex items-center space-x-2 ${isBookmarked ? 'text-blue-600' : 'text-gray-600'} hover:text-blue-600 transition-colors`}
                             >
-                                <Bookmark className={`w-5 h-5 ${story.isBookmarked ? 'fill-current' : ''}`} />
+                                <Bookmark className={`w-5 h-5 ${isBookmarked ? 'fill-current' : ''}`} />
                                 <span>Save</span>
                             </Button>
 
@@ -207,7 +293,7 @@ export default function StoryPage({ params }) {
                                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
                             >
                                 <MessageCircle className="w-5 h-5" />
-                                <span>{story.comments}</span>
+                                <span>{commentCount}</span>
                             </Button>
                         </div>
 
@@ -272,24 +358,49 @@ export default function StoryPage({ params }) {
 
                         {/* Comments List */}
                         <div className="space-y-6">
-                            {comments.map((comment) => (
-                                <div key={comment.id} className="flex space-x-4">
-                                    <img
-                                        src={comment.avatar}
-                                        alt={comment.author}
-                                        className="w-10 h-10 rounded-full border-2 border-white shadow-md flex-shrink-0"
-                                    />
-                                    <div className="flex-1">
-                                        <div className="bg-gray-50 rounded-lg p-4">
-                                            <div className="flex items-center space-x-2 mb-2">
-                                                <span className="font-semibold text-gray-900">{comment.author}</span>
-                                                <span className="text-sm text-gray-600">{comment.timestamp}</span>
+                            {commentsLoading ? (
+                                <div className="animate-pulse space-y-4">
+                                    {[1, 2].map(i => (
+                                        <div key={i} className="flex space-x-4">
+                                            <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                                            <div className="flex-1">
+                                                <div className="bg-gray-100 rounded-lg p-4">
+                                                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                                                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                                                </div>
                                             </div>
-                                            <p className="text-gray-800">{comment.content}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : comments.length > 0 ? (
+                                comments.map((comment) => (
+                                    <div key={comment.id} className="flex space-x-4">
+                                        <img
+                                            src={comment.author?.avatar || comment.authorAvatar || "/api/placeholder/32/32"}
+                                            alt={comment.author?.name || comment.authorName || 'User'}
+                                            className="w-10 h-10 rounded-full border-2 border-white shadow-md flex-shrink-0"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="bg-gray-50 rounded-lg p-4">
+                                                <div className="flex items-center space-x-2 mb-2">
+                                                    <span className="font-semibold text-gray-900">
+                                                        {comment.author?.name || comment.authorName || 'Anonymous'}
+                                                    </span>
+                                                    <span className="text-sm text-gray-600">
+                                                        {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : comment.timestamp}
+                                                    </span>
+                                                </div>
+                                                <p className="text-gray-800">{comment.content}</p>
+                                            </div>
                                         </div>
                                     </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8 text-gray-500">
+                                    <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                    <p>No comments yet. Be the first to share your thoughts!</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </Card>
 

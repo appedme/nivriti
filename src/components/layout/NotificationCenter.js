@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,84 +29,66 @@ import {
     Settings,
     MoreHorizontal
 } from 'lucide-react'
+import { useNotifications, useNotificationMutation } from '@/hooks/useApi'
+import { useToast } from '@/hooks/use-toast'
+import Link from 'next/link'
 
-const mockNotifications = [
-    {
-        id: '1',
-        type: 'like',
-        title: 'Sarah liked your story',
-        message: '"The Art of Letting Go" received a new like',
-        actor: {
-            name: 'Sarah Chen',
-            username: 'sarah_chen',
-            avatar: '/api/placeholder/40/40'
-        },
-        createdAt: '2 minutes ago',
-        isRead: false,
-        actionUrl: '/story/art-of-letting-go',
-        metadata: {
-            storyTitle: 'The Art of Letting Go'
-        }
-    },
-    {
-        id: '2',
-        type: 'comment',
-        title: 'New comment on your story',
-        message: 'Alex commented: "This really resonated with me. Thank you for sharing..."',
-        actor: {
-            name: 'Alex River',
-            username: 'alexr',
-            avatar: '/api/placeholder/40/40'
-        },
-        createdAt: '1 hour ago',
-        isRead: false,
-        actionUrl: '/story/midnight-thoughts#comments',
-        metadata: {
-            storyTitle: 'Midnight Thoughts',
-            commentPreview: 'This really resonated with me. Thank you for sharing...'
-        }
-    },
-    {
-        id: '3',
-        type: 'follow',
-        title: 'Maya started following you',
-        message: 'Maya Patel is now following your stories',
-        actor: {
-            name: 'Maya Patel',
-            username: 'maya_writes',
-            avatar: '/api/placeholder/40/40'
-        },
-        createdAt: '3 hours ago',
-        isRead: true,
-        actionUrl: '/profile/maya_writes'
-    },
-    {
-        id: '4',
-        type: 'story',
-        title: 'Featured story',
-        message: '"Daily Rituals" was featured in today\'s curated collection',
-        createdAt: '1 day ago',
-        isRead: true,
-        actionUrl: '/story/daily-rituals',
-        metadata: {
-            storyTitle: 'Daily Rituals',
-            collection: 'Mindful Living'
-        }
-    },
-    {
-        id: '5',
-        type: 'milestone',
-        title: 'Story milestone reached',
-        message: '"The Art of Letting Go" reached 100 likes!',
-        createdAt: '2 days ago',
-        isRead: true,
-        actionUrl: '/story/art-of-letting-go',
-        metadata: {
-            storyTitle: 'The Art of Letting Go',
-            milestone: '100 likes'
-        }
+const getNotificationIcon = (type) => {
+    switch (type) {
+        case 'like':
+            return <Heart className="w-4 h-4 text-red-500" />
+        case 'comment':
+            return <MessageCircle className="w-4 h-4 text-blue-500" />
+        case 'follow':
+            return <UserPlus className="w-4 h-4 text-green-500" />
+        case 'story':
+            return <BookOpen className="w-4 h-4 text-purple-500" />
+        case 'bookmark':
+            return <Star className="w-4 h-4 text-yellow-500" />
+        case 'milestone':
+            return <Star className="w-4 h-4 text-orange-500" />
+        case 'share':
+            return <Share2 className="w-4 h-4 text-blue-400" />
+        default:
+            return <Bell className="w-4 h-4 text-gray-500" />
     }
-]
+}
+
+const getNotificationMessage = (notification) => {
+    const { type, actor, metadata } = notification;
+
+    switch (type) {
+        case 'like':
+            return `${actor?.name || 'Someone'} liked your story "${metadata?.storyTitle || 'your story'}"`;
+        case 'comment':
+            return `${actor?.name || 'Someone'} commented on "${metadata?.storyTitle || 'your story'}"`;
+        case 'follow':
+            return `${actor?.name || 'Someone'} started following you`;
+        case 'story':
+            return `${actor?.name || 'Someone'} published a new story "${metadata?.storyTitle || 'a new story'}"`;
+        case 'bookmark':
+            return `${actor?.name || 'Someone'} bookmarked your story "${metadata?.storyTitle || 'your story'}"`;
+        case 'milestone':
+            return `Your story "${metadata?.storyTitle || 'your story'}" reached ${metadata?.milestone || 'a milestone'}!`;
+        case 'share':
+            return `${actor?.name || 'Someone'} shared your story "${metadata?.storyTitle || 'your story'}"`;
+        default:
+            return notification.message || 'New notification';
+    }
+}
+
+const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+
+    return date.toLocaleDateString();
+}
 
 const notificationIcons = {
     like: Heart,
@@ -115,42 +99,70 @@ const notificationIcons = {
     share: Share2
 }
 
-export default function NotificationCenter({ user }) {
-    const [notifications, setNotifications] = useState(mockNotifications)
+export default function NotificationCenter() {
+    const { data: session } = useSession()
+    const { toast } = useToast()
     const [isOpen, setIsOpen] = useState(false)
 
-    const unreadCount = notifications.filter(n => !n.isRead).length
+    //user
+    const user = session?.user || null;
 
-    const markAsRead = (notificationId) => {
-        setNotifications(prev => 
-            prev.map(notification => 
-                notification.id === notificationId 
-                    ? { ...notification, isRead: true }
-                    : notification
-            )
-        )
+    // API hooks
+    const { data: notifications, loading, error, refetch } = useNotifications()
+    const { markAsRead, markAllAsRead, deleteNotification, loading: mutationLoading } = useNotificationMutation()
+
+    const unreadCount = 2//notifications?.filter(n => !n.isRead).length || 0
+
+    const handleMarkAsRead = async (notificationId) => {
+        try {
+            await markAsRead(notificationId)
+            await refetch()
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to mark notification as read.",
+                variant: "destructive"
+            })
+        }
     }
 
-    const markAllAsRead = () => {
-        setNotifications(prev => 
-            prev.map(notification => ({ ...notification, isRead: true }))
-        )
+    const handleMarkAllAsRead = async () => {
+        try {
+            await markAllAsRead()
+            await refetch()
+            toast({
+                title: "All notifications marked as read",
+                description: "All your notifications have been marked as read.",
+            })
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to mark all notifications as read.",
+                variant: "destructive"
+            })
+        }
     }
 
-    const deleteNotification = (notificationId) => {
-        setNotifications(prev => 
-            prev.filter(notification => notification.id !== notificationId)
-        )
+    const handleDeleteNotification = async (notificationId) => {
+        try {
+            await deleteNotification(notificationId)
+            await refetch()
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to delete notification.",
+                variant: "destructive"
+            })
+        }
     }
 
     const NotificationItem = ({ notification }) => {
         const IconComponent = notificationIcons[notification.type] || Bell
-        
+
         return (
-            <div 
-                className={`relative p-4 hover:bg-muted/50 transition-colors cursor-pointer border-l-2 ${
-                    notification.isRead ? 'border-transparent' : 'border-primary'
-                }`}
+            <div
+                className={`relative p-4 hover:bg-muted/50 transition-colors cursor-pointer border-l-2 ${notification.isRead ? 'border-transparent' : 'border-primary'
+                    }`}
                 onClick={() => {
                     markAsRead(notification.id)
                     if (notification.actionUrl) {
@@ -184,7 +196,7 @@ export default function NotificationCenter({ user }) {
                                     {notification.message}
                                 </p>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
                                 <span className="text-xs text-muted-foreground whitespace-nowrap">
                                     {notification.createdAt}
@@ -205,7 +217,7 @@ export default function NotificationCenter({ user }) {
                                                 Mark as read
                                             </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuItem 
+                                        <DropdownMenuItem
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 deleteNotification(notification.id)
@@ -258,8 +270,8 @@ export default function NotificationCenter({ user }) {
                 <Button variant="ghost" size="sm" className="relative">
                     <Bell className="h-5 w-5" />
                     {unreadCount > 0 && (
-                        <Badge 
-                            variant="destructive" 
+                        <Badge
+                            variant="destructive"
                             className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
                         >
                             {unreadCount > 99 ? '99+' : unreadCount}
@@ -267,7 +279,7 @@ export default function NotificationCenter({ user }) {
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            
+
             <DropdownMenuContent align="end" className="w-80 p-0">
                 {/* Header */}
                 <div className="p-4 border-b">
@@ -298,12 +310,12 @@ export default function NotificationCenter({ user }) {
 
                 {/* Notifications List */}
                 <ScrollArea className="max-h-96">
-                    {notifications.length > 0 ? (
+                    {notifications?.length > 0 ? (
                         <div className="divide-y">
                             {notifications.map((notification) => (
-                                <NotificationItem 
-                                    key={notification.id} 
-                                    notification={notification} 
+                                <NotificationItem
+                                    key={notification.id}
+                                    notification={notification}
                                 />
                             ))}
                         </div>
@@ -321,7 +333,7 @@ export default function NotificationCenter({ user }) {
                 </ScrollArea>
 
                 {/* Footer */}
-                {notifications.length > 0 && (
+                {notifications?.length > 0 && (
                     <div className="p-3 border-t">
                         <Button variant="ghost" size="sm" className="w-full justify-center text-xs">
                             View all notifications

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -128,7 +129,7 @@ export default function Header({ user }) {
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}>
                                         <LogOut className="mr-2 h-4 w-4" />
                                         Sign out
                                     </DropdownMenuItem>

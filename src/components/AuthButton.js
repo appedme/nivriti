@@ -30,7 +30,7 @@ export default function AuthButton() {
                     </span>
                 </div>
                 <button
-                    onClick={() => signOut()}
+                    onClick={() => signOut({ callbackUrl: "/" })}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
                 >
                     Sign out
@@ -41,7 +41,7 @@ export default function AuthButton() {
 
     return (
         <button
-            onClick={() => signIn("google")}
+            onClick={() => signIn("google", { callbackUrl: "/" })}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center space-x-2"
         >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
