@@ -1,7 +1,3 @@
-Here's a clean breakdown for a **simplified MVP version of Nivriti**, focusing only on **core storytelling and community functions**. This is ideal for validating the idea and getting early users.
-
----
-
 ## 🪷 **Nivriti MVP – Calm Storytelling Platform**
 
 ### ✨ **Core Features (MVP)**
@@ -76,10 +72,15 @@ Here's a clean breakdown for a **simplified MVP version of Nivriti**, focusing o
 ### 💭 Suggested Stack (MVP Tech)
 
 * **Frontend:** Next.js 15 + Tailwind CSS
-* **Backend:** Supabase / Firebase
-* **Auth:** Supabase Auth / Firebase Auth
-* **Database:** Supabase Postgres
-* **File Storage:** Supabase Storage
-* **Deployment:** Vercel
+* **Backend:** Next.js API routes
+* **State Management:** React Query or SWR
+* **Auth:** AuthJS
+* **Database:** Cloudflare D1 
+* **File Storage:** Cloudflare R2
+* **Deployment:** Cloudflare Workers
+* **Hosting:** Cloudflare Pages
+* **Analytics:** Cloudflare Analytics
+* **SEO:** Next.js built-in SEO features
+* **Documentation:** Markdown files in repo, GitHub Wiki
 
 
