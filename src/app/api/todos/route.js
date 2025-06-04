@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getDB, schema } from '@/db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { auth } from '@/lib/auth';
 
 export async function GET() {
     try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const db = getDB();
-        const todos = await db.select().from(schema.todos).orderBy(schema.todos.createdAt);
+        const todos = await db
+            .select()
+            .from(schema.todos)
+            .where(eq(schema.todos.userId, session.user.id))
+            .orderBy(schema.todos.createdAt);
+
         return NextResponse.json(todos);
     } catch (error) {
         console.error('Error fetching todos:', error);
@@ -15,6 +27,12 @@ export async function GET() {
 
 export async function POST(request) {
     try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { title, description } = body;
 
@@ -29,6 +47,7 @@ export async function POST(request) {
                 title,
                 description: description || null,
                 completed: false,
+                userId: session.user.id,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             })

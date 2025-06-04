@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getDB, schema } from '@/db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { auth } from '@/lib/auth';
 
 export async function PUT(request, { params }) {
     try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { id } = await params;
         const body = await request.json();
         const { title, description, completed } = body;
@@ -17,7 +24,10 @@ export async function PUT(request, { params }) {
                 ...(completed !== undefined && { completed }),
                 updatedAt: new Date(),
             })
-            .where(eq(schema.todos.id, parseInt(id)))
+            .where(and(
+                eq(schema.todos.id, parseInt(id)),
+                eq(schema.todos.userId, session.user.id)
+            ))
             .returning();
 
         if (updatedTodo.length === 0) {
@@ -33,12 +43,21 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
     try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { id } = await params;
 
         const db = getDB();
         const deletedTodo = await db
             .delete(schema.todos)
-            .where(eq(schema.todos.id, parseInt(id)))
+            .where(and(
+                eq(schema.todos.id, parseInt(id)),
+                eq(schema.todos.userId, session.user.id)
+            ))
             .returning();
 
         if (deletedTodo.length === 0) {

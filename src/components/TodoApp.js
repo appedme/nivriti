@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import AuthButton from './AuthButton';
 
 export default function TodoApp() {
+    const { data: session, status } = useSession();
     const [todos, setTodos] = useState([]);
     const [newTodo, setNewTodo] = useState({ title: '', description: '' });
     const [loading, setLoading] = useState(true);
@@ -83,16 +86,18 @@ export default function TodoApp() {
     };
 
     useEffect(() => {
-        fetchTodos();
+        if (session) {
+            fetchTodos();
+        }
+    }, [session]);
 
+    useEffect(() => {
         // Add keyboard shortcuts
         const handleKeyDown = (e) => {
             // Ctrl/Cmd + Enter to submit form
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && newTodo.title.trim()) {
                 e.preventDefault();
-                if (newTodo.title.trim()) {
-                    addTodo(e);
-                }
+                document.querySelector('form')?.requestSubmit();
             }
         };
 
@@ -124,6 +129,35 @@ export default function TodoApp() {
         }
     };
 
+    // Show loading spinner while checking authentication
+    if (status === "loading") {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
+
+    // Show authentication prompt if not signed in
+    if (!session) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="max-w-md w-full text-center space-y-8 p-8">
+                    <div>
+                        <h1 className="text-4xl font-bold text-gray-900 mb-4">Nivrita</h1>
+                        <p className="text-lg text-gray-600 mb-8">
+                            Your personal todo application
+                        </p>
+                        <p className="text-sm text-gray-500 mb-8">
+                            Please sign in to access your todos
+                        </p>
+                    </div>
+                    <AuthButton />
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -135,10 +169,19 @@ export default function TodoApp() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
             <div className="max-w-2xl mx-auto">
+                {/* Authentication Header */}
+                <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Nivrita</h1>
+                        <p className="text-sm text-gray-600">Your personal todo app</p>
+                    </div>
+                    <AuthButton />
+                </div>
+
                 <div className="bg-white rounded-2xl shadow-xl p-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-                        📝 Simple Todo App
-                    </h1>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+                        📝 My Todos
+                    </h2>
 
                     {/* Stats Summary */}
                     {todos.length > 0 && (
@@ -225,8 +268,8 @@ export default function TodoApp() {
                                                     key={key}
                                                     onClick={() => setFilter(key)}
                                                     className={`px-3 py-1 text-sm rounded-md transition-colors ${filter === key
-                                                            ? 'bg-blue-100 text-blue-700 font-medium'
-                                                            : 'text-gray-600 hover:bg-gray-100'
+                                                        ? 'bg-blue-100 text-blue-700 font-medium'
+                                                        : 'text-gray-600 hover:bg-gray-100'
                                                         }`}
                                                 >
                                                     {label} ({count})
@@ -262,15 +305,15 @@ export default function TodoApp() {
                                         <div
                                             key={todo.id}
                                             className={`flex items-start gap-3 p-4 border rounded-lg transition-all ${todo.completed
-                                                    ? 'bg-gray-50 border-gray-200'
-                                                    : 'bg-white border-gray-300 hover:border-blue-300'
+                                                ? 'bg-gray-50 border-gray-200'
+                                                : 'bg-white border-gray-300 hover:border-blue-300'
                                                 }`}
                                         >
                                             <button
                                                 onClick={() => toggleTodo(todo.id, todo.completed)}
                                                 className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${todo.completed
-                                                        ? 'bg-green-500 border-green-500 text-white'
-                                                        : 'border-gray-300 hover:border-green-500'
+                                                    ? 'bg-green-500 border-green-500 text-white'
+                                                    : 'border-gray-300 hover:border-green-500'
                                                     }`}
                                             >
                                                 {todo.completed && '✓'}
@@ -279,8 +322,8 @@ export default function TodoApp() {
                                             <div className="flex-1 min-w-0">
                                                 <h3
                                                     className={`font-medium ${todo.completed
-                                                            ? 'text-gray-500 line-through'
-                                                            : 'text-gray-900'
+                                                        ? 'text-gray-500 line-through'
+                                                        : 'text-gray-900'
                                                         }`}
                                                 >
                                                     {todo.title}
