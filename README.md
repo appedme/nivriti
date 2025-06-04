@@ -1,6 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🪷 Nivriti - A Calm Storytelling Platform
 
-## Getting Started
+Nivriti is a peaceful storytelling platform designed to help users share their stories, connect through written experiences, and find calm through reading and writing.
+
+## ✨ Core Features
+
+### 🔐 Authentication
+
+- Sign up / Sign in (Email or Google)
+- Basic onboarding: choose username, bio, and genre preference
+
+### 📝 Writing
+
+- Create a new story (Title, Content, Tags)
+- Edit & update your own stories
+- Save drafts
+- Story cover (auto-generated or optional upload)
+
+### 📚 Reading
+
+- View public stories by others (clean reader view)
+- Filter by tags or genre (e.g., Romance, Fiction, Diary, Healing)
+- Search stories by title or author
+
+### 📣 Sharing
+
+- Share story via public link
+- Copy quote/snippet button
+- Open Graph preview for social platforms
+
+### 👤 Profile
+
+- View user profile: name, photo, bio, list of stories written
+- Link to social media (optional)
+
+### 💬 Interaction
+
+- Add comment to a story (basic comment box)
+- Like / react to a story (e.g., "❤️ Felt this")
+
+### 🧺 Create List (Reading Lists)
+
+- Save stories to custom lists like "Favorites," "To Read," "Healing" etc.
+- Public or private toggle on lists
+
+## 💭 Tech Stack
+
+- **Frontend:** Next.js 15 + Tailwind CSS
+- **Backend:** Next.js API routes
+- **State Management:** React Query or SWR
+- **Auth:** AuthJS
+- **Database:** Cloudflare D1
+- **File Storage:** Cloudflare R2
+- **Deployment:** Cloudflare Workers
+- **Hosting:** Cloudflare Pages
+- **Analytics:** Cloudflare Analytics
+
+## 🚀 Getting Started
 
 First, run the development server:
 
@@ -16,21 +71,27 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## 🛠️ Development
+
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a font family from Vercel.
 
-## Learn More
+## 🔮 Future Features (Post-MVP)
+
+- Audio narration
+- AI insights / mood tagging
+- Writing focus mode
+- Journals / private stories
+- Community circles
+- Monetization
+- Offline mode
+- Reading with sound
+- Story analytics
+
+## 📚 Learn More
 
 To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Learn Next.js](https://nextjs.org/learn)
