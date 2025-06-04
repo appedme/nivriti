@@ -109,8 +109,16 @@ export const comments = sqliteTable('comments', {
     storyId: text('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
     authorId: text('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     parentId: integer('parent_id').references(() => comments.id, { onDelete: 'cascade' }),
+    likeCount: integer('like_count').default(0).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export const commentLikes = sqliteTable('comment_likes', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    commentId: integer('comment_id').notNull().references(() => comments.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const follows = sqliteTable('follows', {

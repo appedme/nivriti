@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getDB, schema } from '@/db'
+import { getDB, schema } from '@/db/dev'
 import { eq, desc, and } from 'drizzle-orm'
 
 // GET /api/stories/[id]/comments - Fetch comments for a story
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -86,6 +87,7 @@ export async function GET(request, { params }) {
 // POST /api/stories/[id]/comments - Create a new comment
 export async function POST(request, { params }) {
   try {
+    const resolvedParams = await params;
     const session = await auth()
     if (!session?.user) {
       return NextResponse.json(
@@ -94,7 +96,7 @@ export async function POST(request, { params }) {
       )
     }
 
-    const { id } = params
+    const { id } = resolvedParams;
     const body = await request.json()
     const { content, parentId } = body
 

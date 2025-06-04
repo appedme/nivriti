@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Heart, Bookmark, Share2, MessageCircle, Copy, Twitter, Facebook, Link2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,13 @@ import Layout from '@/components/layout/Layout';
 import { useStory, useComments, useApiMutation } from '@/hooks/useApi';
 import Link from 'next/link';
 
+import { use } from 'react';
+
 export default function StoryPage({ params }) {
+    const resolvedParams = use(params);
     const { data: session } = useSession();
-    const { data: storyData, loading: storyLoading, error: storyError } = useStory(params.id);
-    const { data: commentsData, loading: commentsLoading, refetch: refetchComments } = useComments(params.id);
+    const { data: storyData, loading: storyLoading, error: storyError } = useStory(resolvedParams.id);
+    const { data: commentsData, loading: commentsLoading, refetch: refetchComments } = useComments(resolvedParams.id);
     const { mutate } = useApiMutation();
 
     const [comment, setComment] = useState('');
@@ -34,98 +37,125 @@ export default function StoryPage({ params }) {
         }
     }, [storyData]);
 
+    // Persist state to localStorage for non-authenticated users
+    useEffect(() => {
+        if (!session && storyData?.story) {
+            const storyId = storyData.story.id;
+            
+            // Get state from localStorage
+            const savedState = localStorage.getItem(`story_${storyId}_state`);
+            if (savedState) {
+                try {
+                    const parsedState = JSON.parse(savedState);
+                    setIsLiked(parsedState.isLiked || false);
+                    setIsBookmarked(parsedState.isBookmarked || false);
+                } catch (e) {
+                    console.error('Error parsing saved state:', e);
+                }
+            }
+        }
+    }, [session, storyData]);
+
+    // Save state to localStorage when it changes
+    useEffect(() => {
+        if (!session && storyData?.story) {
+            const storyId = storyData.story.id;
+            const stateToSave = { isLiked, isBookmarked };
+            localStorage.setItem(`story_${storyId}_state`, JSON.stringify(stateToSave));
+        }
+    }, [isLiked, isBookmarked, session, storyData]);
+
     const story = storyData?.story;
     const comments = commentsData?.comments || [];
 
-    const handleLike = async () => {
-        if (!session) {
-            toast.error('Please sign in to like stories');
-            return;
-        }
-
+    // Parse and render story content (Editor.js JSON format)
+    const renderStoryContent = (content) => {
         try {
-            const optimisticLiked = !isLiked;
-            const optimisticCount = optimisticLiked ? likeCount + 1 : likeCount - 1;
-
-            // Optimistic update
-            setIsLiked(optimisticLiked);
-            setLikeCount(optimisticCount);
-
-            await mutate(`/api/stories/${params.id}/like`, {
-                method: 'POST'
-            });
-
-            toast.success(optimisticLiked ? 'Story liked!' : 'Story unliked');
-        } catch (error) {
-            // Revert optimistic update on error
-            setIsLiked(!isLiked);
-            setLikeCount(likeCount);
-            toast.error('Failed to update like status');
-        }
-    };
-
-    const handleBookmark = async () => {
-        if (!session) {
-            toast.error('Please sign in to bookmark stories');
-            return;
-        }
-
-        try {
-            setIsBookmarked(!isBookmarked);
-
-            await mutate(`/api/stories/${params.id}/bookmark`, {
-                method: 'POST'
-            });
-
-            toast.success(isBookmarked ? 'Bookmark removed' : 'Story bookmarked!');
-        } catch (error) {
-            setIsBookmarked(isBookmarked);
-            toast.error('Failed to update bookmark status');
-        }
-    };
-
-    const handleShare = (platform) => {
-        const url = window.location.href;
-        const text = `"${story?.title}" by ${story?.author?.name} on Nivriti`;
-
-        switch (platform) {
-            case 'twitter':
-                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`);
-                break;
-            case 'facebook':
-                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`);
-                break;
-            case 'copy':
-                navigator.clipboard.writeText(url);
-                toast.success('Link copied to clipboard!');
-                break;
-        }
-        setShowShareMenu(false);
-    };
-
-    const handleAddComment = async () => {
-        if (!session) {
-            toast.error('Please sign in to comment');
-            return;
-        }
-
-        if (!comment.trim()) {
-            toast.error('Please enter a comment');
-            return;
-        }
-
-        try {
-            await mutate(`/api/stories/${params.id}/comments`, {
-                method: 'POST',
-                body: JSON.stringify({ content: comment.trim() })
-            });
-
-            setComment('');
-            setCommentCount(commentCount + 1);
-            refetchComments();
-            toast.success('Comment added!');
-        } catch (error) {
-            toast.error('Failed to add comment');
+            if (typeof content === 'string') {
+                const parsedContent = JSON.parse(content);
+                if (!parsedContent.blocks) {
+                    // If not Editor.js format, treat as plain text
+                    return content.split('\n\n').map((paragraph, index) => (
+                        <p key={index} className="mb-6 text-gray-800 leading-relaxed">
+                            {paragraph}
+                        </p>
+                    ));
+                }
+                
+                return parsedContent.blocks.map((block, index) => {
+                    if (!block.data) return null;
+                    
+                    switch (block.type) {
+                        case 'header':
+                            const HeadingTag = `h${block.data.level}`;
+                            return React.createElement(HeadingTag, { 
+                                key: index, 
+                                className: `text-${4-block.data.level}xl font-bold mb-4` 
+                            }, block.data.text);
+                        
+                        case 'paragraph':
+                            return (
+                                <p key={index} className="mb-6 text-gray-800 leading-relaxed" 
+                                   dangerouslySetInnerHTML={{ __html: block.data.text }} />
+                            );
+                        
+                        case 'list':
+                            if (block.data.style === 'ordered') {
+                                return (
+                                    <ol key={index} className="mb-6 pl-6 list-decimal">
+                                        {block.data.items.map((item, i) => (
+                                            <li key={i} className="mb-2" dangerouslySetInnerHTML={{ __html: item }} />
+                                        ))}
+                                    </ol>
+                                );
+                            } else {
+                                return (
+                                    <ul key={index} className="mb-6 pl-6 list-disc">
+                                        {block.data.items.map((item, i) => (
+                                            <li key={i} className="mb-2" dangerouslySetInnerHTML={{ __html: item }} />
+                                        ))}
+                                    </ul>
+                                );
+                            }
+                        
+                        case 'quote':
+                            return (
+                                <blockquote key={index} className="mb-6 pl-4 border-l-4 border-gray-300 italic">
+                                    <p dangerouslySetInnerHTML={{ __html: block.data.text }} />
+                                    {block.data.caption && <cite className="block mt-2 text-sm text-gray-600">— {block.data.caption}</cite>}
+                                </blockquote>
+                            );
+                        
+                        case 'code':
+                            return (
+                                <pre key={index} className="mb-6 p-4 bg-gray-100 rounded-lg overflow-x-auto">
+                                    <code>{block.data.code}</code>
+                                </pre>
+                            );
+                        
+                        default:
+                            return (
+                                <p key={index} className="mb-6 text-gray-800 leading-relaxed" 
+                                   dangerouslySetInnerHTML={{ __html: block.data.text || '' }} />
+                            );
+                    }
+                });
+            }
+            
+            // Fallback to plain text
+            return content.split('\n\n').map((paragraph, index) => (
+                <p key={index} className="mb-6 text-gray-800 leading-relaxed">
+                    {paragraph}
+                </p>
+            ));
+        } catch (e) {
+            console.error("Error rendering content:", e);
+            // Fallback to plain text
+            return content.split('\n\n').map((paragraph, index) => (
+                <p key={index} className="mb-6 text-gray-800 leading-relaxed">
+                    {paragraph}
+                </p>
+            ));
         }
     };
 
@@ -255,11 +285,7 @@ export default function StoryPage({ params }) {
                             </div>
                         ) : (
                             <div className="story-content prose prose-lg max-w-none">
-                                {story.content.split('\n\n').map((paragraph, index) => (
-                                    <p key={index} className="mb-6 text-gray-800 leading-relaxed">
-                                        {paragraph}
-                                    </p>
-                                ))}
+                                {renderStoryContent(story.content)}
                             </div>
                         )}
                     </Card>

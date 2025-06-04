@@ -1,12 +1,14 @@
 'use client'
 
+import { use } from 'react'
 import { useStory } from '@/hooks/useApi'
 import { useChapters } from '@/hooks/useChapters'
 import BookReader from '@/components/stories/BookReader'
 
 export default function ReadPage({ params }) {
-  const { data: storyData, loading: storyLoading, error: storyError } = useStory(params.id)
-  const { chapters, loading: chaptersLoading, error: chaptersError } = useChapters(params.id)
+  const resolvedParams = use(params);
+  const { data: storyData, loading: storyLoading, error: storyError } = useStory(resolvedParams.id)
+  const { chapters, loading: chaptersLoading, error: chaptersError } = useChapters(resolvedParams.id)
   
   if (storyLoading || chaptersLoading) {
     return (

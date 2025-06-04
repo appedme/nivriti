@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getDB, schema } from '@/db'
+import { getDB, schema } from '@/db/dev'
 import { eq, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 // GET /api/stories/[id] - Fetch a specific story
 export async function GET(request, { params }) {
     try {
-        const { id } = params
+        const resolvedParams = await params;
+        const { id } = resolvedParams;
         const { searchParams } = new URL(request.url)
         const includeChapters = searchParams.get('includeChapters') === 'true'
         
@@ -82,6 +83,36 @@ export async function GET(request, { params }) {
             }
         }
 
+        // Get user's like/bookmark status if authenticated
+        let isLiked = false
+        let isBookmarked = false
+        
+        if (session?.user) {
+            // Check if user liked this story
+            const userLike = await db
+                .select()
+                .from(schema.likes)
+                .where(and(
+                    eq(schema.likes.storyId, id),
+                    eq(schema.likes.userId, session.user.id)
+                ))
+                .limit(1)
+            
+            isLiked = userLike.length > 0
+
+            // Check if user bookmarked this story
+            const userBookmark = await db
+                .select()
+                .from(schema.bookmarks)
+                .where(and(
+                    eq(schema.bookmarks.storyId, id),
+                    eq(schema.bookmarks.userId, session.user.id)
+                ))
+                .limit(1)
+            
+            isBookmarked = userBookmark.length > 0
+        }
+
         return NextResponse.json({
             story: {
                 id: storyData.id,
@@ -99,6 +130,8 @@ export async function GET(request, { params }) {
                 isPublished: storyData.isPublished,
                 isMultiChapter: storyData.isMultiChapter,
                 chapterCount: storyData.chapterCount,
+                isLiked,
+                isBookmarked,
                 author: {
                     id: storyData.authorId,
                     name: storyData.authorName,

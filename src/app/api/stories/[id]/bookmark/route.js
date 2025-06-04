@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getDB, schema } from '@/db'
+import { getDB, schema } from '@/db/dev'
 import { eq, and } from 'drizzle-orm'
 
 // POST /api/stories/[id]/bookmark - Bookmark/unbookmark a story

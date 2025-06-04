@@ -297,3 +297,16 @@ export function useUpdateStory() {
     const { updateStory, loading, error } = useStoryMutation()
     return { updateStory, loading, error }
 }
+
+export function useUpdateProfile() {
+    const { mutate, loading, error } = useApiMutation()
+    
+    const updateProfile = async (profileData) => {
+        return mutate('/api/users/profile', {
+            method: 'PUT',
+            body: JSON.stringify(profileData)
+        })
+    }
+    
+    return { updateProfile, loading, error }
+}

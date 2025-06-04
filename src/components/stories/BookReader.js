@@ -16,6 +16,7 @@ export default function BookReader({ story, chapters }) {
   const [activeChapter, setActiveChapter] = useState(0)
   const [tocSheetOpen, setTocSheetOpen] = useState(false)
   const [settingsSheetOpen, setSettingsSheetOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const contentRef = useRef(null)
   
   // Reading preferences
@@ -331,19 +332,26 @@ export default function BookReader({ story, chapters }) {
   const handlePreviousChapter = () => {
     if (activeChapter > 0) {
       setActiveChapter(activeChapter - 1)
-      window.scrollTo(0, 0)
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0
+      }
     }
   }
   
   const handleNextChapter = () => {
     if (activeChapter < chapters.length - 1) {
       setActiveChapter(activeChapter + 1)
-      window.scrollTo(0, 0)
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0
+      }
     }
   }
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={styleProperties}>
+      {/* Reading Settings */}
+      <ReaderSettings />
+      
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/40 glass-effect">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -452,7 +460,7 @@ export default function BookReader({ story, chapters }) {
                   {chapters[activeChapter]?.title || `Chapter ${activeChapter + 1}`}
                 </h1>
                 <Separator className="my-4" />
-                <div className="chapter-content">
+                <div className="chapter-content" ref={contentRef} style={styleProperties}>
                   {renderChapterContent(chapters[activeChapter]?.content)}
                 </div>
               </>

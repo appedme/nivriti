@@ -1,18 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, Filter, Users, BookOpen, TrendingUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useStories } from '@/hooks/useApi';
 import Layout from '@/components/layout/Layout';
+import { useStories } from '@/hooks/useApi';
 import StoryCard from '@/components/stories/StoryCard';
 import Link from 'next/link';
 
-export default function SearchPage() {
+// Loading component
+function SearchLoading() {
+    return (
+        <Layout>
+            <div className="container mx-auto px-4 py-8">
+                <div className="max-w-4xl mx-auto">
+                    <div className="animate-pulse">
+                        <div className="h-12 bg-gray-200 rounded-lg mb-6"></div>
+                        <div className="h-8 bg-gray-200 rounded mb-4 w-1/3"></div>
+                        <div className="space-y-4">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Layout>
+    );
+}
+
+// Search content component that uses useSearchParams
+function SearchContent() {
+
     const searchParams = useSearchParams();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -217,5 +240,14 @@ export default function SearchPage() {
                 </div>
             </div>
         </Layout>
+    );
+}
+
+// Main page component with Suspense boundary
+export default function SearchPage() {
+    return (
+        <Suspense fallback={<SearchLoading />}>
+            <SearchContent />
+        </Suspense>
     );
 }

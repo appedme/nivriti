@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getDB, schema } from '@/db'
+import { getDB, schema } from '@/db/dev'
 import { eq, desc, and, like, or } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getDB, schema } from '@/db'
+import { getDB, schema } from '@/db/dev'
 import { eq, and, asc } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 
 // GET /api/stories/[id]/chapters - Get all chapters for a story
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
     const db = getDB()
 
     // Check if story exists and if it's published or the user is the author

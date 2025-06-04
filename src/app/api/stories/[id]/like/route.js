@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getDB, schema } from '@/db'
+import { getDB, schema } from '@/db/dev'
 import { eq, and } from 'drizzle-orm'
 
 // POST /api/stories/[id]/like - Like/unlike a story
@@ -60,6 +60,7 @@ export async function POST(request, { params }) {
                 .where(eq(schema.stories.id, id))
 
             return NextResponse.json({
+                success: true,
                 liked: false,
                 likeCount: story[0].likeCount - 1,
                 message: 'Story unliked'
@@ -78,6 +79,7 @@ export async function POST(request, { params }) {
                 .where(eq(schema.stories.id, id))
 
             return NextResponse.json({
+                success: true,
                 liked: true,
                 likeCount: story[0].likeCount + 1,
                 message: 'Story liked'
