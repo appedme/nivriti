@@ -41,7 +41,7 @@ export default function StoryPage({ params }) {
     useEffect(() => {
         if (!session && storyData?.story) {
             const storyId = storyData.story.id;
-            
+
             // Get state from localStorage
             const savedState = localStorage.getItem(`story_${storyId}_state`);
             if (savedState) {
@@ -68,6 +68,88 @@ export default function StoryPage({ params }) {
     const story = storyData?.story;
     const comments = commentsData?.comments || [];
 
+    // Handle like functionality
+    const handleLike = async () => {
+        if (!session) {
+            toast.error('Please sign in to like stories');
+            return;
+        }
+
+        try {
+            setIsLiked(!isLiked);
+            setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+
+            await mutate(`/api/stories/${resolvedParams.id}/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isLiked: !isLiked })
+            });
+
+            toast.success(isLiked ? 'Removed from likes' : 'Added to likes');
+        } catch (error) {
+            // Revert optimistic update
+            setIsLiked(isLiked);
+            setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
+            toast.error('Failed to update like status');
+            console.error('Error updating like:', error);
+        }
+    };
+
+    // Handle bookmark functionality
+    const handleBookmark = async () => {
+        if (!session) {
+            toast.error('Please sign in to bookmark stories');
+            return;
+        }
+
+        try {
+            setIsBookmarked(!isBookmarked);
+
+            await mutate(`/api/stories/${resolvedParams.id}/bookmark`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isBookmarked: !isBookmarked })
+            });
+
+            toast.success(isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks');
+        } catch (error) {
+            // Revert optimistic update
+            setIsBookmarked(isBookmarked);
+            toast.error('Failed to update bookmark status');
+            console.error('Error updating bookmark:', error);
+        }
+    };
+
+    // Handle comment submission
+    const handleCommentSubmit = async (e) => {
+        e.preventDefault();
+        if (!session) {
+            toast.error('Please sign in to comment');
+            return;
+        }
+
+        if (!comment.trim()) {
+            toast.error('Please enter a comment');
+            return;
+        }
+
+        try {
+            await mutate(`/api/stories/${resolvedParams.id}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: comment.trim() })
+            });
+
+            setComment('');
+            setCommentCount(prev => prev + 1);
+            refetchComments();
+            toast.success('Comment added successfully');
+        } catch (error) {
+            toast.error('Failed to add comment');
+            console.error('Error adding comment:', error);
+        }
+    };
+
     // Parse and render story content (Editor.js JSON format)
     const renderStoryContent = (content) => {
         try {
@@ -81,24 +163,24 @@ export default function StoryPage({ params }) {
                         </p>
                     ));
                 }
-                
+
                 return parsedContent.blocks.map((block, index) => {
                     if (!block.data) return null;
-                    
+
                     switch (block.type) {
                         case 'header':
                             const HeadingTag = `h${block.data.level}`;
-                            return React.createElement(HeadingTag, { 
-                                key: index, 
-                                className: `text-${4-block.data.level}xl font-bold mb-4` 
+                            return React.createElement(HeadingTag, {
+                                key: index,
+                                className: `text-${4 - block.data.level}xl font-bold mb-4`
                             }, block.data.text);
-                        
+
                         case 'paragraph':
                             return (
-                                <p key={index} className="mb-6 text-gray-800 leading-relaxed" 
-                                   dangerouslySetInnerHTML={{ __html: block.data.text }} />
+                                <p key={index} className="mb-6 text-gray-800 leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: block.data.text }} />
                             );
-                        
+
                         case 'list':
                             if (block.data.style === 'ordered') {
                                 return (
@@ -117,7 +199,7 @@ export default function StoryPage({ params }) {
                                     </ul>
                                 );
                             }
-                        
+
                         case 'quote':
                             return (
                                 <blockquote key={index} className="mb-6 pl-4 border-l-4 border-gray-300 italic">
@@ -125,23 +207,23 @@ export default function StoryPage({ params }) {
                                     {block.data.caption && <cite className="block mt-2 text-sm text-gray-600">— {block.data.caption}</cite>}
                                 </blockquote>
                             );
-                        
+
                         case 'code':
                             return (
                                 <pre key={index} className="mb-6 p-4 bg-gray-100 rounded-lg overflow-x-auto">
                                     <code>{block.data.code}</code>
                                 </pre>
                             );
-                        
+
                         default:
                             return (
-                                <p key={index} className="mb-6 text-gray-800 leading-relaxed" 
-                                   dangerouslySetInnerHTML={{ __html: block.data.text || '' }} />
+                                <p key={index} className="mb-6 text-gray-800 leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: block.data.text || '' }} />
                             );
                     }
                 });
             }
-            
+
             // Fallback to plain text
             return content.split('\n\n').map((paragraph, index) => (
                 <p key={index} className="mb-6 text-gray-800 leading-relaxed">
@@ -271,7 +353,7 @@ export default function StoryPage({ params }) {
                                 <p className="text-gray-600 max-w-2xl mx-auto">
                                     {story.excerpt || "This story is presented as a book with multiple chapters for an immersive reading experience."}
                                 </p>
-                                <Button 
+                                <Button
                                     asChild
                                     className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
                                     size="lg"
@@ -375,7 +457,7 @@ export default function StoryPage({ params }) {
                                 className="mb-4 min-h-[100px] bg-white/70 border-gray-200 focus:border-blue-300 focus:ring-blue-300"
                             />
                             <Button
-                                onClick={handleAddComment}
+                                onClick={handleCommentSubmit}
                                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
                             >
                                 Add Comment

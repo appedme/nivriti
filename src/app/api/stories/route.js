@@ -13,9 +13,19 @@ export async function GET(request) {
         const tag = searchParams.get('tag')
         const author = searchParams.get('author')
         const search = searchParams.get('search')
+        const myStories = searchParams.get('myStories') === 'true'
+        const status = searchParams.get('status') // published, draft, all
         const offset = (page - 1) * limit
 
         const db = getDB()
+        let session = null
+        
+        if (myStories) {
+            session = await auth()
+            if (!session?.user) {
+                return new Response("Unauthorized", { status: 401 })
+            }
+        }
 
         let query = db
             .select({
@@ -39,13 +49,28 @@ export async function GET(request) {
             })
             .from(schema.stories)
             .leftJoin(schema.users, eq(schema.stories.authorId, schema.users.id))
-            .where(eq(schema.stories.isPublished, true))
             .orderBy(desc(schema.stories.createdAt))
             .limit(limit)
             .offset(offset)
 
         // Apply filters
-        const conditions = [eq(schema.stories.isPublished, true)]
+        const conditions = []
+        
+        if (myStories && session?.user) {
+            conditions.push(eq(schema.stories.authorId, session.user.id))
+        } else if (!myStories) {
+            // Only show published stories for public feeds
+            conditions.push(eq(schema.stories.isPublished, true))
+        }
+        
+        // Filter by status if specified
+        if (status && myStories) {
+            if (status === 'published') {
+                conditions.push(eq(schema.stories.isPublished, true))
+            } else if (status === 'draft') {
+                conditions.push(eq(schema.stories.isPublished, false))
+            }
+        }
 
         if (tag) {
             conditions.push(like(schema.stories.tags, `%${tag}%`))
@@ -124,14 +149,14 @@ export async function POST(request) {
         }
 
         const body = await request.json()
-        const { 
-            title, 
-            content, 
-            excerpt, 
-            tags, 
-            coverImage, 
+        const {
+            title,
+            content,
+            excerpt,
+            tags,
+            coverImage,
             isPublished = false,
-            isMultiChapter = false 
+            isMultiChapter = false
         } = body
 
         if (!title) {
@@ -150,14 +175,41 @@ export async function POST(request) {
         }
 
         const db = getDB()
-        
+
+        // Check if user exists in database
+        const existingUser = await db
+            .select()
+            .from(schema.users)
+            .where(eq(schema.users.id, session.user.id))
+            .limit(1)
+
+        if (existingUser.length === 0) {
+            // Create user if doesn't exist
+            console.log('Creating user:', session.user)
+            try {
+                await db.insert(schema.users).values({
+                    id: session.user.id,
+                    name: session.user.name,
+                    email: session.user.email,
+                    image: session.user.image,
+                    username: session.user.email?.split('@')[0] || `user_${session.user.id.slice(0, 8)}`,
+                })
+            } catch (userError) {
+                console.error('Error creating user:', userError)
+                return NextResponse.json(
+                    { error: 'Failed to create user account' },
+                    { status: 500 }
+                )
+            }
+        }
+
         // Import editor utilities
         const { calculateReadTime, extractExcerpt } = await import('@/lib/editor')
 
         // Calculate read time and excerpt for single stories
         let readTime = null
         let storyExcerpt = excerpt
-        
+
         if (!isMultiChapter && content) {
             readTime = calculateReadTime(content)
             if (!storyExcerpt) {

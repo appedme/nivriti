@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Layout from '@/components/layout/Layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import StoryCard from '@/components/stories/StoryCard'
+import { useStories, useTrendingStories, useFeaturedStories, useStoriesByTag } from '@/hooks/useStories'
 import { 
   Search, 
   Filter, 
@@ -25,297 +27,173 @@ const genres = [
   'Mindfulness', 'Adventure', 'Mystery', 'Self Discovery', 'Love Letters'
 ]
 
-const mockStories = [
-  {
-    id: '1',
-    title: 'The Art of Letting Go',
-    excerpt: 'Sometimes the most beautiful thing we can do is release what no longer serves us...',
-    author: { name: 'Luna Martinez', avatar: '/api/placeholder/40/40' },
-    coverImage: '/api/placeholder/400/200',
-    tags: ['Healing', 'Mindfulness'],
-    publishedAt: '3 hours ago',
-    readTime: 7,
-    likeCount: 89,
-    commentCount: 23,
-    viewCount: 445,
-    isLiked: false,
-    isBookmarked: false
-  },
-  // Add more mock stories...
-]
-
-const featuredAuthors = [
-  {
-    id: '1',
-    name: 'Sarah Chen',
-    bio: 'Writing about mindfulness and daily magic',
-    avatar: '/api/placeholder/60/60',
-    followers: '3.2k',
-    stories: 24,
-    tags: ['Mindfulness', 'Daily Life']
-  },
-  {
-    id: '2',
-    name: 'Marcus Rivera',
-    bio: 'Stories of healing and hope',
-    avatar: '/api/placeholder/60/60',
-    followers: '2.8k',
-    stories: 18,
-    tags: ['Healing', 'Life Stories']
-  },
-  {
-    id: '3',
-    name: 'Zoe Kim',
-    bio: 'Poetry for the wandering soul',
-    avatar: '/api/placeholder/60/60',
-    followers: '4.1k',
-    stories: 32,
-    tags: ['Poetry', 'Self Discovery']
-  }
-]
-
 export default function ExplorePage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedGenre, setSelectedGenre] = useState('All')
-  const [activeTab, setActiveTab] = useState('stories')
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState('All');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Fetch stories based on search and filters
+  const { stories: allStories, isLoading: allStoriesLoading } = useStories({ 
+    search: debouncedQuery,
+    tag: selectedGenre !== 'All' ? selectedGenre : null,
+    limit: 30
+  });
+  
+  const { stories: trendingStories, isLoading: trendingLoading } = useTrendingStories({ limit: 10 });
+  const { stories: featuredStories, isLoading: featuredLoading } = useFeaturedStories({ limit: 5 });
+  
+  const handleGenreChange = (genre) => {
+    setSelectedGenre(genre);
+  };
 
-  const handleSearch = (e) => {
-    e.preventDefault()
-    // Handle search logic
-  }
+  // Render skeletons while loading
+  const renderStorySkeletons = (count) => {
+    return Array(count).fill(0).map((_, i) => (
+      <Card key={i} className="overflow-hidden">
+        <div className="relative">
+          <Skeleton className="w-full h-48" />
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+            <Skeleton className="h-6 w-3/4 bg-gray-200/50 mb-2" />
+            <Skeleton className="h-4 w-1/2 bg-gray-200/50" />
+          </div>
+        </div>
+        <CardContent className="p-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center space-x-2">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <Skeleton className="h-6 w-16" />
+          </div>
+          <div className="flex space-x-2 mt-2">
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+    ));
+  };
 
   return (
     <Layout>
-      <div className="min-h-screen bg-background">
-        {/* Header Section */}
-        <section className="border-b border-border/40 bg-background/95 backdrop-blur">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="max-w-4xl mx-auto text-center space-y-6">
-              <h1 className="text-4xl font-bold tracking-tight">
-                Explore Stories
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Discover meaningful stories from writers around the world
-              </p>
-
-              {/* Search Bar */}
-              <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search stories, authors, or topics..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-12 pl-12 pr-4 text-base"
-                  />
-                </div>
-              </form>
-
-              {/* Genre Filter */}
-              <div className="flex flex-wrap justify-center gap-2">
-                {genres.map((genre) => (
-                  <Badge
-                    key={genre}
-                    variant={selectedGenre === genre ? "default" : "secondary"}
-                    className="cursor-pointer transition-colors px-4 py-2"
-                    onClick={() => setSelectedGenre(genre)}
-                  >
-                    {genre}
-                  </Badge>
+      <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Hero section */}
+          <section className="mb-12 text-center">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Explore Stories</h1>
+            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+              Discover thoughtful stories from writers around the world. Find inspiration, healing, and connection.
+            </p>
+            
+            <div className="max-w-lg mx-auto relative">
+              <Input
+                placeholder="Search stories..."
+                className="pl-10 border-gray-200 focus:ring-2 focus:ring-blue-500 h-12 shadow-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            </div>
+          </section>
+          
+          {/* Genre filters */}
+          <section className="mb-8 overflow-x-auto pb-2">
+            <div className="flex space-x-2">
+              {genres.map((genre, i) => (
+                <Badge
+                  key={i}
+                  variant={selectedGenre === genre ? "default" : "outline"}
+                  className={`px-4 py-1.5 cursor-pointer text-sm font-medium ${
+                    selectedGenre === genre 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleGenreChange(genre)}
+                >
+                  {genre}
+                </Badge>
+              ))}
+            </div>
+          </section>
+          
+          {/* Featured Stories */}
+          <section className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold text-gray-900 flex items-center">
+                <Star className="w-5 h-5 mr-2 text-yellow-500" /> 
+                Featured Stories
+              </h2>
+            </div>
+            
+            {featuredLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                {renderStorySkeletons(5)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                {(featuredStories?.length > 0 ? featuredStories : allStories.slice(0, 5)).map((story) => (
+                  <StoryCard key={story.id} story={story} layout="vertical" />
                 ))}
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Main Content */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex flex-col lg:flex-row gap-8">
-              {/* Main Content Area */}
-              <div className="flex-1">
-                <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 mb-8">
-                  <TabsTrigger value="stories" className="flex items-center">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Stories
-                  </TabsTrigger>
-                  <TabsTrigger value="trending" className="flex items-center">
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Trending
-                  </TabsTrigger>
-                  <TabsTrigger value="authors" className="flex items-center">
-                    <Users className="h-4 w-4 mr-2" />
-                    Authors
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Stories Tab */}
-                <TabsContent value="stories" className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold">Latest Stories</h2>
-                    <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filters
+            )}
+          </section>
+          
+          <Tabs defaultValue="all" className="mb-12">
+            <TabsList className="grid grid-cols-2 max-w-md mx-auto mb-8">
+              <TabsTrigger value="all">All Stories</TabsTrigger>
+              <TabsTrigger value="trending">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Trending
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="all" className="mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {allStoriesLoading ? (
+                  renderStorySkeletons(9)
+                ) : allStories.length > 0 ? (
+                  allStories.map((story) => (
+                    <StoryCard key={story.id} story={story} />
+                  ))
+                ) : (
+                  <div className="col-span-3 text-center py-16">
+                    <BookOpen className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <h3 className="text-xl font-medium text-gray-700 mb-2">No stories found</h3>
+                    <p className="text-gray-500 mb-6">Try adjusting your search or filters</p>
+                    <Button onClick={() => { setSearchQuery(''); setSelectedGenre('All'); }}>
+                      Clear filters
                     </Button>
                   </div>
-                  
-                  <div className="grid grid-cols-1 gap-6">
-                    {mockStories.map((story) => (
-                      <StoryCard key={story.id} story={story} />
-                    ))}
-                  </div>
-
-                  <div className="text-center pt-8">
-                    <Button variant="outline" size="lg">
-                      Load More Stories
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                {/* Trending Tab */}
-                <TabsContent value="trending" className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold">Trending This Week</h2>
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Updated hourly</span>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-6">
-                    {mockStories
-                      .sort((a, b) => b.likeCount - a.likeCount)
-                      .map((story) => (
-                        <StoryCard key={story.id} story={story} />
-                      ))}
-                  </div>
-                </TabsContent>
-
-                {/* Authors Tab */}
-                <TabsContent value="authors" className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold">Featured Authors</h2>
-                    <Button variant="outline" size="sm">
-                      <Star className="h-4 w-4 mr-2" />
-                      Top Rated
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {featuredAuthors.map((author) => (
-                      <Card key={author.id} className="hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                          <div className="flex items-start space-x-4">
-                            <Avatar className="h-16 w-16">
-                              <AvatarImage src={author.avatar} alt={author.name} />
-                              <AvatarFallback>{author.name[0]}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 space-y-3">
-                              <div>
-                                <h3 className="font-semibold text-lg">{author.name}</h3>
-                                <p className="text-sm text-muted-foreground">{author.bio}</p>
-                              </div>
-                              
-                              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                <span>{author.followers} followers</span>
-                                <span>•</span>
-                                <span>{author.stories} stories</span>
-                              </div>
-
-                              <div className="flex flex-wrap gap-1">
-                                {author.tags.map((tag, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-
-                              <Button size="sm" className="w-full">
-                                <Heart className="h-4 w-4 mr-2" />
-                                Follow
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
+                )}
               </div>
-
-              {/* Sidebar */}
-              <div className="lg:w-80 space-y-6">
-                {/* Quick Stats */}
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-semibold">Community Stats</h3>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Stories today</span>
-                      <span className="font-semibold">127</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Active writers</span>
-                      <span className="font-semibold">2,341</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Stories liked</span>
-                      <span className="font-semibold">8,456</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Trending Topics */}
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-semibold">Trending Topics</h3>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {[
-                        { topic: 'Self Care Sunday', count: 89 },
-                        { topic: 'Evening Reflections', count: 67 },
-                        { topic: 'City Life', count: 54 },
-                        { topic: 'Finding Joy', count: 43 },
-                        { topic: 'Quiet Moments', count: 38 }
-                      ].map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-sm font-medium">#{item.topic}</span>
-                          <span className="text-xs text-muted-foreground">{item.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Reading Challenge */}
-                <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-                  <CardHeader>
-                    <h3 className="font-semibold">Reading Challenge</h3>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Join our monthly reading challenge and discover new perspectives.
-                    </p>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>7/20 stories</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full" style={{ width: '35%' }} />
-                      </div>
-                    </div>
-                    <Button size="sm" className="w-full">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Join Challenge
-                    </Button>
-                  </CardContent>
-                </Card>
+            </TabsContent>
+            
+            <TabsContent value="trending" className="mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {trendingLoading ? (
+                  renderStorySkeletons(9)
+                ) : trendingStories.length > 0 ? (
+                  trendingStories.map((story) => (
+                    <StoryCard key={story.id} story={story} />
+                  ))
+                ) : (
+                  <div className="col-span-3 text-center py-16">
+                    <TrendingUp className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <h3 className="text-xl font-medium text-gray-700 mb-2">No trending stories</h3>
+                    <p className="text-gray-500">Check back soon for trending content</p>
+                  </div>
+                )}
               </div>
-            </div>
+            </TabsContent>
           </Tabs>
         </div>
       </div>

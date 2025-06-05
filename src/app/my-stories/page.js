@@ -6,73 +6,36 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
-
-// Mock user stories data
-const userStoriesData = {
-  published: [
-    {
-      id: 1,
-      title: "Finding Peace in the Morning Light",
-      excerpt: "The first rays of sunlight filtered through my bedroom window, painting golden patterns on the wall...",
-      publishedAt: "2024-01-15",
-      lastEditedAt: "2024-01-15",
-      readTime: "3 min read",
-      tags: ["mindfulness", "morning", "peace"],
-      likes: 142,
-      comments: 28,
-      views: 856,
-      status: "published",
-      coverImage: "/api/placeholder/300/200"
-    },
-    {
-      id: 2,
-      title: "The Art of Slow Living",
-      excerpt: "In a world that moves at breakneck speed, I've learned to find beauty in taking things slow...",
-      publishedAt: "2024-01-10",
-      lastEditedAt: "2024-01-12",
-      readTime: "5 min read",
-      tags: ["lifestyle", "mindfulness", "wellness"],
-      likes: 89,
-      comments: 15,
-      views: 432,
-      status: "published",
-      coverImage: "/api/placeholder/300/200"
-    }
-  ],
-  drafts: [
-    {
-      id: 3,
-      title: "Untitled Draft",
-      excerpt: "Sometimes the most profound moments come in the silence between thoughts...",
-      createdAt: "2024-01-18",
-      lastEditedAt: "2024-01-18",
-      wordCount: 487,
-      status: "draft",
-      tags: ["reflection", "mindfulness"]
-    },
-    {
-      id: 4,
-      title: "Journey to Self-Discovery",
-      excerpt: "The path to understanding ourselves is never linear. It winds through valleys of doubt...",
-      createdAt: "2024-01-16",
-      lastEditedAt: "2024-01-17",
-      wordCount: 1234,
-      status: "draft",
-      tags: ["growth", "healing", "journey"]
-    }
-  ]
-};
+import { usePublishedStories, useDraftStories } from '@/hooks/useStories';
+import { format } from 'date-fns';
 
 export default function MyStoriesPage() {
-  const [stories] = useState(userStoriesData);
   const [activeTab, setActiveTab] = useState('published');
+  
+  // Using SWR to fetch data
+  const { stories: publishedStories, isLoading: publishedLoading, mutate: mutatePublished } = usePublishedStories({ limit: 20 });
+  const { stories: draftStories, isLoading: draftLoading, mutate: mutateDrafts } = useDraftStories({ limit: 20 });
 
-  const handleDeleteStory = (storyId) => {
+  const handleDeleteStory = async (storyId) => {
     if (confirm('Are you sure you want to delete this story? This action cannot be undone.')) {
-      // Delete story logic here
-      console.log('Deleting story:', storyId);
+      try {
+        const response = await fetch(`/api/stories/${storyId}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          // Revalidate the data
+          mutatePublished();
+          mutateDrafts();
+        } else {
+          console.error('Failed to delete story');
+        }
+      } catch (error) {
+        console.error('Error deleting story:', error);
+      }
     }
   };
 
@@ -92,7 +55,7 @@ export default function MyStoriesPage() {
           <Edit3 className="w-4 h-4" />
           <span>Edit</span>
         </Link>
-        {story.status === 'published' && (
+        {story.isPublished && (
           <Link href={`/story/${story.id}`} className="flex items-center space-x-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
             <Eye className="w-4 h-4" />
             <span>View</span>
@@ -113,6 +76,27 @@ export default function MyStoriesPage() {
           <span>Delete</span>
         </button>
       </div>
+    </div>
+  );
+
+  // Loading skeletons
+  const renderSkeletons = (count = 3) => (
+    <div className="space-y-4">
+      {Array(count).fill(0).map((_, i) => (
+        <Card key={i} className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex space-x-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-6 w-16" />
+              </div>
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+          </div>
+        </Card>
+      ))}
     </div>
   );
 
@@ -143,7 +127,7 @@ export default function MyStoriesPage() {
                   <BookOpen className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stories.published.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{publishedLoading ? '–' : publishedStories.length}</p>
                   <p className="text-sm text-gray-600">Published</p>
                 </div>
               </div>
@@ -155,7 +139,7 @@ export default function MyStoriesPage() {
                   <Edit3 className="w-5 h-5 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stories.drafts.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{draftLoading ? '–' : draftStories.length}</p>
                   <p className="text-sm text-gray-600">Drafts</p>
                 </div>
               </div>
@@ -168,7 +152,7 @@ export default function MyStoriesPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900">
-                    {stories.published.reduce((total, story) => total + story.likes, 0)}
+                    {publishedLoading ? '–' : publishedStories.reduce((total, story) => total + (story.likes || 0), 0)}
                   </p>
                   <p className="text-sm text-gray-600">Total Likes</p>
                 </div>
@@ -182,7 +166,7 @@ export default function MyStoriesPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900">
-                    {stories.published.reduce((total, story) => total + story.views, 0)}
+                    {publishedLoading ? '–' : publishedStories.reduce((total, story) => total + (story.views || 0), 0)}
                   </p>
                   <p className="text-sm text-gray-600">Total Views</p>
                 </div>
@@ -190,158 +174,130 @@ export default function MyStoriesPage() {
             </Card>
           </div>
 
-          {/* Stories Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="published">Published ({stories.published.length})</TabsTrigger>
-              <TabsTrigger value="drafts">Drafts ({stories.drafts.length})</TabsTrigger>
+          {/* Tabs */}
+          <Tabs defaultValue="published" className="mb-8" onValueChange={setActiveTab}>
+            <TabsList className="grid grid-cols-2 w-full max-w-md mx-auto bg-white/20">
+              <TabsTrigger value="published">Published Stories</TabsTrigger>
+              <TabsTrigger value="drafts">Drafts</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="published" className="space-y-6">
-              {stories.published.length > 0 ? (
+            {/* Published Stories Tab */}
+            <TabsContent value="published" className="mt-6">
+              {publishedLoading ? (
+                renderSkeletons(3)
+              ) : publishedStories.length === 0 ? (
+                <div className="text-center py-12">
+                  <BookOpen className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-xl font-medium text-gray-700 mb-2">No published stories yet</h3>
+                  <p className="text-gray-500 mb-6">Share your thoughts and stories with the world</p>
+                  <Link href="/write">
+                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Write Your First Story
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
                 <div className="space-y-4">
-                  {stories.published.map((story) => (
-                    <Card key={story.id} className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow group">
-                      <div className="flex items-start justify-between">
+                  {publishedStories.map((story) => (
+                    <Card key={story.id} className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                      <div className="flex justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <Link href={`/story/${story.id}`} className="hover:text-blue-600 transition-colors">
-                              <h3 className="text-xl font-bold text-gray-900">{story.title}</h3>
-                            </Link>
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              Published
-                            </Badge>
-                          </div>
-                          
+                          <Link href={`/story/${story.id}`}>
+                            <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 mb-2">{story.title}</h3>
+                          </Link>
                           <p className="text-gray-600 mb-4 line-clamp-2">{story.excerpt}</p>
                           
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>Published {new Date(story.publishedAt).toLocaleDateString()}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{story.readTime}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Heart className="w-4 h-4" />
-                              <span>{story.likes} likes</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <MessageCircle className="w-4 h-4" />
-                              <span>{story.comments} comments</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Eye className="w-4 h-4" />
-                              <span>{story.views} views</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2">
-                            {story.tags.map((tag) => (
-                              <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
-                                #{tag}
-                              </span>
+                          <div className="flex items-center flex-wrap gap-2 mb-4">
+                            {story.tags?.map((tag, i) => (
+                              <Badge key={i} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                {tag}
+                              </Badge>
                             ))}
                           </div>
-                        </div>
-                        
-                        {story.coverImage && (
-                          <div className="ml-6 flex-shrink-0">
-                            <img 
-                              src={story.coverImage} 
-                              alt={story.title}
-                              className="w-24 h-24 object-cover rounded-lg shadow-md"
-                            />
+                          
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-1" />
+                              <span>{format(new Date(story.publishedAt || story.createdAt), 'MMM d, yyyy')}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="w-4 h-4 mr-1" />
+                              <span>{story.readTime}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Heart className="w-4 h-4 mr-1" />
+                              <span>{story.likes}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <MessageCircle className="w-4 h-4 mr-1" />
+                              <span>{story.comments}</span>
+                            </div>
                           </div>
-                        )}
+                        </div>
                         
                         <StoryActionsMenu story={story} />
                       </div>
                     </Card>
                   ))}
                 </div>
-              ) : (
-                <Card className="p-12 text-center bg-white/70 backdrop-blur-sm border-0 shadow-lg">
-                  <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No published stories yet</h3>
-                  <p className="text-gray-600 mb-6">Share your first story with the world</p>
-                  <Link href="/write">
-                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
-                      Write Your First Story
-                    </Button>
-                  </Link>
-                </Card>
               )}
             </TabsContent>
 
-            <TabsContent value="drafts" className="space-y-6">
-              {stories.drafts.length > 0 ? (
+            {/* Drafts Tab */}
+            <TabsContent value="drafts" className="mt-6">
+              {draftLoading ? (
+                renderSkeletons(2)
+              ) : draftStories.length === 0 ? (
+                <div className="text-center py-12">
+                  <Edit3 className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-xl font-medium text-gray-700 mb-2">No drafts yet</h3>
+                  <p className="text-gray-500 mb-6">Start writing and save your ideas as drafts</p>
+                  <Link href="/write">
+                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Start Writing
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
                 <div className="space-y-4">
-                  {stories.drafts.map((story) => (
-                    <Card key={story.id} className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow group">
-                      <div className="flex items-start justify-between">
+                  {draftStories.map((story) => (
+                    <Card key={story.id} className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+                      <div className="flex justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <Link href={`/write?edit=${story.id}`} className="hover:text-blue-600 transition-colors">
-                              <h3 className="text-xl font-bold text-gray-900">{story.title}</h3>
-                            </Link>
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                              Draft
-                            </Badge>
-                          </div>
+                          <Link href={`/write?edit=${story.id}`}>
+                            <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 mb-2">
+                              {story.title || "Untitled Draft"}
+                            </h3>
+                          </Link>
+                          <p className="text-gray-600 mb-4 line-clamp-2">{story.excerpt || "No excerpt available..."}</p>
                           
-                          <p className="text-gray-600 mb-4 line-clamp-2">{story.excerpt}</p>
-                          
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>Created {new Date(story.createdAt).toLocaleDateString()}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Edit3 className="w-4 h-4" />
-                              <span>Last edited {new Date(story.lastEditedAt).toLocaleDateString()}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <BookOpen className="w-4 h-4" />
-                              <span>{story.wordCount} words</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2">
-                            {story.tags.map((tag) => (
-                              <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
-                                #{tag}
-                              </span>
+                          <div className="flex items-center flex-wrap gap-2 mb-4">
+                            {story.tags?.map((tag, i) => (
+                              <Badge key={i} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                {tag}
+                              </Badge>
                             ))}
+                          </div>
+                          
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-1" />
+                              <span>{format(new Date(story.createdAt), 'MMM d, yyyy')}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Edit3 className="w-4 h-4 mr-1" />
+                              <span>Last edited: {format(new Date(story.updatedAt || story.createdAt), 'MMM d, yyyy')}</span>
+                            </div>
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-2">
-                          <Link href={`/write?edit=${story.id}`}>
-                            <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-50">
-                              <Edit3 className="w-4 h-4 mr-2" />
-                              Continue Writing
-                            </Button>
-                          </Link>
-                          <StoryActionsMenu story={story} />
-                        </div>
+                        <StoryActionsMenu story={story} />
                       </div>
                     </Card>
                   ))}
                 </div>
-              ) : (
-                <Card className="p-12 text-center bg-white/70 backdrop-blur-sm border-0 shadow-lg">
-                  <Edit3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No drafts saved</h3>
-                  <p className="text-gray-600 mb-6">Start writing and your drafts will appear here</p>
-                  <Link href="/write">
-                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
-                      Start Writing
-                    </Button>
-                  </Link>
-                </Card>
               )}
             </TabsContent>
           </Tabs>
